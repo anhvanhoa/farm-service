@@ -11,10 +11,13 @@ import (
 	"time"
 
 	proto_greenhouse "github.com/anhvanhoa/sf-proto/gen/greenhouse/v1"
+	proto_greenhouse_installation_log "github.com/anhvanhoa/sf-proto/gen/greenhouse_installation_log/v1"
 	proto_growing_zone "github.com/anhvanhoa/sf-proto/gen/growing_zone/v1"
+	proto_growing_zone_history "github.com/anhvanhoa/sf-proto/gen/growing_zone_history/v1"
 	"github.com/spf13/viper"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
+	"google.golang.org/protobuf/types/known/structpb"
 )
 
 var serverAddress string
@@ -26,9 +29,11 @@ func init() {
 }
 
 type FarmServiceClient struct {
-	greenhouseClient  proto_greenhouse.GreenhouseServiceClient
-	growingZoneClient proto_growing_zone.GrowingZoneServiceClient
-	conn              *grpc.ClientConn
+	greenhouseClient                proto_greenhouse.GreenhouseServiceClient
+	greenhouseInstallationLogClient proto_greenhouse_installation_log.GreenhouseInstallationLogServiceClient
+	growingZoneClient               proto_growing_zone.GrowingZoneServiceClient
+	growingZoneHistoryClient        proto_growing_zone_history.GrowingZoneHistoryServiceClient
+	conn                            *grpc.ClientConn
 }
 
 func NewFarmServiceClient(address string) (*FarmServiceClient, error) {
@@ -38,9 +43,11 @@ func NewFarmServiceClient(address string) (*FarmServiceClient, error) {
 	}
 
 	return &FarmServiceClient{
-		greenhouseClient:  proto_greenhouse.NewGreenhouseServiceClient(conn),
-		growingZoneClient: proto_growing_zone.NewGrowingZoneServiceClient(conn),
-		conn:              conn,
+		greenhouseClient:                proto_greenhouse.NewGreenhouseServiceClient(conn),
+		greenhouseInstallationLogClient: proto_greenhouse_installation_log.NewGreenhouseInstallationLogServiceClient(conn),
+		growingZoneClient:               proto_growing_zone.NewGrowingZoneServiceClient(conn),
+		growingZoneHistoryClient:        proto_growing_zone_history.NewGrowingZoneHistoryServiceClient(conn),
+		conn:                            conn,
 	}, nil
 }
 
@@ -602,12 +609,445 @@ func (c *FarmServiceClient) TestDeleteGrowingZone() {
 	fmt.Printf("Message: %s\n", resp.Message)
 }
 
+// ================== Greenhouse Installation Log Service Tests ==================
+
+func (c *FarmServiceClient) TestCreateInstallationLog() {
+	fmt.Println("\n=== Test Create Installation Log ===")
+
+	reader := bufio.NewReader(os.Stdin)
+
+	fmt.Print("Enter greenhouse ID: ")
+	greenhouseId, _ := reader.ReadString('\n')
+	greenhouseId = cleanInput(greenhouseId)
+
+	fmt.Print("Enter action (INSTALL/UPGRADE/MAINTENANCE/RELOCATE/DISMANTLE): ")
+	actionStr, _ := reader.ReadString('\n')
+	actionStr = cleanInput(actionStr)
+
+	var action proto_greenhouse_installation_log.InstallationAction
+	switch strings.ToUpper(actionStr) {
+	case "INSTALL":
+		action = proto_greenhouse_installation_log.InstallationAction_INSTALLATION_ACTION_INSTALL
+	case "UPGRADE":
+		action = proto_greenhouse_installation_log.InstallationAction_INSTALLATION_ACTION_UPGRADE
+	case "MAINTENANCE":
+		action = proto_greenhouse_installation_log.InstallationAction_INSTALLATION_ACTION_MAINTENANCE
+	case "RELOCATE":
+		action = proto_greenhouse_installation_log.InstallationAction_INSTALLATION_ACTION_RELOCATE
+	case "DISMANTLE":
+		action = proto_greenhouse_installation_log.InstallationAction_INSTALLATION_ACTION_DISMANTLE
+	default:
+		action = proto_greenhouse_installation_log.InstallationAction_INSTALLATION_ACTION_INSTALL
+	}
+
+	fmt.Print("Enter description: ")
+	description, _ := reader.ReadString('\n')
+	description = cleanInput(description)
+
+	fmt.Print("Enter performed by: ")
+	performedBy, _ := reader.ReadString('\n')
+	performedBy = cleanInput(performedBy)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	resp, err := c.greenhouseInstallationLogClient.CreateLog(ctx, &proto_greenhouse_installation_log.CreateLogRequest{
+		GreenhouseId: greenhouseId,
+		Action:       action,
+		ActionDate:   time.Now().Format("2006-01-02"),
+		Description:  description,
+		PerformedBy:  performedBy,
+	})
+	if err != nil {
+		fmt.Printf("Error calling CreateLog: %v\n", err)
+		return
+	}
+
+	fmt.Printf("Create Installation Log result:\n")
+	fmt.Printf("Success: %t\n", resp.Success)
+	fmt.Printf("Message: %s\n", resp.Message)
+	fmt.Printf("Log ID: %s\n", resp.Log.Id)
+	fmt.Printf("Greenhouse ID: %s\n", resp.Log.GreenhouseId)
+	fmt.Printf("Action: %s\n", resp.Log.Action.String())
+	fmt.Printf("Description: %s\n", resp.Log.Description)
+	fmt.Printf("Performed By: %s\n", resp.Log.PerformedBy)
+}
+
+func (c *FarmServiceClient) TestGetLogsByGreenhouse() {
+	fmt.Println("\n=== Test Get Logs By Greenhouse ===")
+
+	reader := bufio.NewReader(os.Stdin)
+
+	fmt.Print("Enter greenhouse ID: ")
+	greenhouseId, _ := reader.ReadString('\n')
+	greenhouseId = cleanInput(greenhouseId)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	resp, err := c.greenhouseInstallationLogClient.GetLogsByGreenhouse(ctx, &proto_greenhouse_installation_log.GetLogsByGreenhouseRequest{
+		GreenhouseId: greenhouseId,
+	})
+	if err != nil {
+		fmt.Printf("Error calling GetLogsByGreenhouse: %v\n", err)
+		return
+	}
+
+	fmt.Printf("Get Logs By Greenhouse result:\n")
+	fmt.Printf("Success: %t\n", resp.Success)
+	fmt.Printf("Message: %s\n", resp.Message)
+	fmt.Printf("Logs:\n")
+	for i, log := range resp.Logs {
+		fmt.Printf("  [%d] ID: %s, Action: %s, Date: %s, Performed By: %s\n",
+			i+1, log.Id, log.Action.String(), log.ActionDate.AsTime().Format("2006-01-02 15:04:05"), log.PerformedBy)
+		fmt.Printf("      Description: %s\n", log.Description)
+	}
+}
+
+func (c *FarmServiceClient) TestGetLogsByAction() {
+	fmt.Println("\n=== Test Get Logs By Action ===")
+
+	reader := bufio.NewReader(os.Stdin)
+
+	fmt.Print("Enter action (INSTALL/UPGRADE/MAINTENANCE/RELOCATE/DISMANTLE): ")
+	actionStr, _ := reader.ReadString('\n')
+	actionStr = cleanInput(actionStr)
+
+	var action proto_greenhouse_installation_log.InstallationAction
+	switch strings.ToUpper(actionStr) {
+	case "INSTALL":
+		action = proto_greenhouse_installation_log.InstallationAction_INSTALLATION_ACTION_INSTALL
+	case "UPGRADE":
+		action = proto_greenhouse_installation_log.InstallationAction_INSTALLATION_ACTION_UPGRADE
+	case "MAINTENANCE":
+		action = proto_greenhouse_installation_log.InstallationAction_INSTALLATION_ACTION_MAINTENANCE
+	case "RELOCATE":
+		action = proto_greenhouse_installation_log.InstallationAction_INSTALLATION_ACTION_RELOCATE
+	case "DISMANTLE":
+		action = proto_greenhouse_installation_log.InstallationAction_INSTALLATION_ACTION_DISMANTLE
+	default:
+		action = proto_greenhouse_installation_log.InstallationAction_INSTALLATION_ACTION_INSTALL
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	resp, err := c.greenhouseInstallationLogClient.GetLogsByAction(ctx, &proto_greenhouse_installation_log.GetLogsByActionRequest{
+		Action: action,
+	})
+	if err != nil {
+		fmt.Printf("Error calling GetLogsByAction: %v\n", err)
+		return
+	}
+
+	fmt.Printf("Get Logs By Action result:\n")
+	fmt.Printf("Success: %t\n", resp.Success)
+	fmt.Printf("Message: %s\n", resp.Message)
+	fmt.Printf("Logs:\n")
+	for i, log := range resp.Logs {
+		fmt.Printf("  [%d] ID: %s, Greenhouse ID: %s, Action: %s, Date: %s, Performed By: %s\n",
+			i+1, log.Id, log.GreenhouseId, log.Action.String(), log.ActionDate.AsTime().Format("2006-01-02 15:04:05"), log.PerformedBy)
+		fmt.Printf("      Description: %s\n", log.Description)
+	}
+}
+
+func (c *FarmServiceClient) TestGetLogsByDateRange() {
+	fmt.Println("\n=== Test Get Logs By Date Range ===")
+
+	reader := bufio.NewReader(os.Stdin)
+
+	fmt.Print("Enter start date (YYYY-MM-DD): ")
+	startDateStr, _ := reader.ReadString('\n')
+	startDateStr = cleanInput(startDateStr)
+	startDate, err := time.Parse("2006-01-02", startDateStr)
+	if err != nil {
+		fmt.Printf("Invalid date format. Using current date.\n")
+		startDate = time.Now().AddDate(0, 0, -30) // 30 days ago
+	}
+
+	fmt.Print("Enter end date (YYYY-MM-DD): ")
+	endDateStr, _ := reader.ReadString('\n')
+	endDateStr = cleanInput(endDateStr)
+	endDate, err := time.Parse("2006-01-02", endDateStr)
+	if err != nil {
+		fmt.Printf("Invalid date format. Using current date.\n")
+		endDate = time.Now()
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	resp, err := c.greenhouseInstallationLogClient.GetLogsByDateRange(ctx, &proto_greenhouse_installation_log.GetLogsByDateRangeRequest{
+		StartDate: startDate.Format("2006-01-02"),
+		EndDate:   endDate.Format("2006-01-02"),
+	})
+	if err != nil {
+		fmt.Printf("Error calling GetLogsByDateRange: %v\n", err)
+		return
+	}
+
+	fmt.Printf("Get Logs By Date Range result:\n")
+	fmt.Printf("Success: %t\n", resp.Success)
+	fmt.Printf("Message: %s\n", resp.Message)
+	fmt.Printf("Logs:\n")
+	for i, log := range resp.Logs {
+		fmt.Printf("  [%d] ID: %s, Greenhouse ID: %s, Action: %s, Date: %s, Performed By: %s\n",
+			i+1, log.Id, log.GreenhouseId, log.Action.String(), log.ActionDate.AsTime().Format("2006-01-02 15:04:05"), log.PerformedBy)
+		fmt.Printf("      Description: %s\n", log.Description)
+	}
+}
+
+// ================== Growing Zone History Service Tests ==================
+
+func (c *FarmServiceClient) TestCreateZoneHistory() {
+	fmt.Println("\n=== Test Create Zone History ===")
+
+	reader := bufio.NewReader(os.Stdin)
+
+	fmt.Print("Enter zone ID: ")
+	zoneId, _ := reader.ReadString('\n')
+	zoneId = cleanInput(zoneId)
+
+	fmt.Print("Enter action (CHANGE_SOIL/CHANGE_IRRIGATION/MAINTENANCE/RESIZE/RENAME): ")
+	actionStr, _ := reader.ReadString('\n')
+	actionStr = cleanInput(actionStr)
+
+	var action proto_growing_zone_history.HistoryAction
+	switch strings.ToUpper(actionStr) {
+	case "CHANGE_SOIL":
+		action = proto_growing_zone_history.HistoryAction_HISTORY_ACTION_CHANGE_SOIL
+	case "CHANGE_IRRIGATION":
+		action = proto_growing_zone_history.HistoryAction_HISTORY_ACTION_CHANGE_IRRIGATION
+	case "MAINTENANCE":
+		action = proto_growing_zone_history.HistoryAction_HISTORY_ACTION_MAINTENANCE
+	case "RESIZE":
+		action = proto_growing_zone_history.HistoryAction_HISTORY_ACTION_RESIZE
+	case "RENAME":
+		action = proto_growing_zone_history.HistoryAction_HISTORY_ACTION_RENAME
+	default:
+		action = proto_growing_zone_history.HistoryAction_HISTORY_ACTION_MAINTENANCE
+	}
+
+	fmt.Print("Enter old value (JSON format, optional): ")
+	oldValueStr, _ := reader.ReadString('\n')
+	oldValueStr = cleanInput(oldValueStr)
+	var oldValue *structpb.Struct
+	if oldValueStr != "" {
+		oldValue = &structpb.Struct{}
+		// Simple JSON parsing - in real implementation, you'd want proper validation
+		oldValue.Fields = map[string]*structpb.Value{
+			"value": {Kind: &structpb.Value_StringValue{StringValue: oldValueStr}},
+		}
+	}
+
+	fmt.Print("Enter new value (JSON format, optional): ")
+	newValueStr, _ := reader.ReadString('\n')
+	newValueStr = cleanInput(newValueStr)
+	var newValue *structpb.Struct
+	if newValueStr != "" {
+		newValue = &structpb.Struct{}
+		newValue.Fields = map[string]*structpb.Value{
+			"value": {Kind: &structpb.Value_StringValue{StringValue: newValueStr}},
+		}
+	}
+
+	fmt.Print("Enter performed by: ")
+	performedBy, _ := reader.ReadString('\n')
+	performedBy = cleanInput(performedBy)
+
+	fmt.Print("Enter notes (optional): ")
+	notes, _ := reader.ReadString('\n')
+	notes = cleanInput(notes)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	resp, err := c.growingZoneHistoryClient.CreateHistory(ctx, &proto_growing_zone_history.CreateHistoryRequest{
+		ZoneId:      zoneId,
+		Action:      action,
+		OldValue:    oldValue,
+		NewValue:    newValue,
+		PerformedBy: performedBy,
+		Notes:       notes,
+	})
+	if err != nil {
+		fmt.Printf("Error calling CreateHistory: %v\n", err)
+		return
+	}
+
+	fmt.Printf("Create Zone History result:\n")
+	fmt.Printf("Success: %t\n", resp.Success)
+	fmt.Printf("Message: %s\n", resp.Message)
+	fmt.Printf("History ID: %s\n", resp.History.Id)
+	fmt.Printf("Zone ID: %s\n", resp.History.ZoneId)
+	fmt.Printf("Action: %s\n", resp.History.Action.String())
+	fmt.Printf("Performed By: %s\n", resp.History.PerformedBy)
+	fmt.Printf("Notes: %s\n", resp.History.Notes)
+}
+
+func (c *FarmServiceClient) TestGetHistoryByZone() {
+	fmt.Println("\n=== Test Get History By Zone ===")
+
+	reader := bufio.NewReader(os.Stdin)
+
+	fmt.Print("Enter zone ID: ")
+	zoneId, _ := reader.ReadString('\n')
+	zoneId = cleanInput(zoneId)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	resp, err := c.growingZoneHistoryClient.GetHistoryByZone(ctx, &proto_growing_zone_history.GetHistoryByZoneRequest{
+		ZoneId: zoneId,
+	})
+	if err != nil {
+		fmt.Printf("Error calling GetHistoryByZone: %v\n", err)
+		return
+	}
+
+	fmt.Printf("Get History By Zone result:\n")
+	fmt.Printf("Success: %t\n", resp.Success)
+	fmt.Printf("Message: %s\n", resp.Message)
+	fmt.Printf("Histories:\n")
+	for i, history := range resp.Histories {
+		fmt.Printf("  [%d] ID: %s, Action: %s, Date: %s, Performed By: %s\n",
+			i+1, history.Id, history.Action.String(), history.ActionDate.AsTime().Format("2006-01-02 15:04:05"), history.PerformedBy)
+		fmt.Printf("      Notes: %s\n", history.Notes)
+	}
+}
+
+func (c *FarmServiceClient) TestGetHistoryByAction() {
+	fmt.Println("\n=== Test Get History By Action ===")
+
+	reader := bufio.NewReader(os.Stdin)
+
+	fmt.Print("Enter action (CHANGE_SOIL/CHANGE_IRRIGATION/MAINTENANCE/RESIZE/RENAME): ")
+	actionStr, _ := reader.ReadString('\n')
+	actionStr = cleanInput(actionStr)
+
+	var action proto_growing_zone_history.HistoryAction
+	switch strings.ToUpper(actionStr) {
+	case "CHANGE_SOIL":
+		action = proto_growing_zone_history.HistoryAction_HISTORY_ACTION_CHANGE_SOIL
+	case "CHANGE_IRRIGATION":
+		action = proto_growing_zone_history.HistoryAction_HISTORY_ACTION_CHANGE_IRRIGATION
+	case "MAINTENANCE":
+		action = proto_growing_zone_history.HistoryAction_HISTORY_ACTION_MAINTENANCE
+	case "RESIZE":
+		action = proto_growing_zone_history.HistoryAction_HISTORY_ACTION_RESIZE
+	case "RENAME":
+		action = proto_growing_zone_history.HistoryAction_HISTORY_ACTION_RENAME
+	default:
+		action = proto_growing_zone_history.HistoryAction_HISTORY_ACTION_MAINTENANCE
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	resp, err := c.growingZoneHistoryClient.GetHistoryByAction(ctx, &proto_growing_zone_history.GetHistoryByActionRequest{
+		Action: action,
+	})
+	if err != nil {
+		fmt.Printf("Error calling GetHistoryByAction: %v\n", err)
+		return
+	}
+
+	fmt.Printf("Get History By Action result:\n")
+	fmt.Printf("Success: %t\n", resp.Success)
+	fmt.Printf("Message: %s\n", resp.Message)
+	fmt.Printf("Histories:\n")
+	for i, history := range resp.Histories {
+		fmt.Printf("  [%d] ID: %s, Zone ID: %s, Action: %s, Date: %s, Performed By: %s\n",
+			i+1, history.Id, history.ZoneId, history.Action.String(), history.ActionDate.AsTime().Format("2006-01-02 15:04:05"), history.PerformedBy)
+		fmt.Printf("      Notes: %s\n", history.Notes)
+	}
+}
+
+func (c *FarmServiceClient) TestGetHistoryByDateRange() {
+	fmt.Println("\n=== Test Get History By Date Range ===")
+
+	reader := bufio.NewReader(os.Stdin)
+
+	fmt.Print("Enter start date (YYYY-MM-DD): ")
+	startDateStr, _ := reader.ReadString('\n')
+	startDateStr = cleanInput(startDateStr)
+	startDate, err := time.Parse("2006-01-02", startDateStr)
+	if err != nil {
+		fmt.Printf("Invalid date format. Using current date.\n")
+		startDate = time.Now().AddDate(0, 0, -30) // 30 days ago
+	}
+
+	fmt.Print("Enter end date (YYYY-MM-DD): ")
+	endDateStr, _ := reader.ReadString('\n')
+	endDateStr = cleanInput(endDateStr)
+	endDate, err := time.Parse("2006-01-02", endDateStr)
+	if err != nil {
+		fmt.Printf("Invalid date format. Using current date.\n")
+		endDate = time.Now()
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	resp, err := c.growingZoneHistoryClient.GetHistoryByDateRange(ctx, &proto_growing_zone_history.GetHistoryByDateRangeRequest{
+		StartDate: startDate.Format("2006-01-02"),
+		EndDate:   endDate.Format("2006-01-02"),
+	})
+	if err != nil {
+		fmt.Printf("Error calling GetHistoryByDateRange: %v\n", err)
+		return
+	}
+
+	fmt.Printf("Get History By Date Range result:\n")
+	fmt.Printf("Success: %t\n", resp.Success)
+	fmt.Printf("Message: %s\n", resp.Message)
+	fmt.Printf("Histories:\n")
+	for i, history := range resp.Histories {
+		fmt.Printf("  [%d] ID: %s, Zone ID: %s, Action: %s, Date: %s, Performed By: %s\n",
+			i+1, history.Id, history.ZoneId, history.Action.String(), history.ActionDate.AsTime().Format("2006-01-02 15:04:05"), history.PerformedBy)
+		fmt.Printf("      Notes: %s\n", history.Notes)
+	}
+}
+
+func (c *FarmServiceClient) TestGetHistoryByPerformedBy() {
+	fmt.Println("\n=== Test Get History By Performed By ===")
+
+	reader := bufio.NewReader(os.Stdin)
+
+	fmt.Print("Enter performed by: ")
+	performedBy, _ := reader.ReadString('\n')
+	performedBy = cleanInput(performedBy)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	resp, err := c.growingZoneHistoryClient.GetHistoryByPerformedBy(ctx, &proto_growing_zone_history.GetHistoryByPerformedByRequest{
+		PerformedBy: performedBy,
+	})
+	if err != nil {
+		fmt.Printf("Error calling GetHistoryByPerformedBy: %v\n", err)
+		return
+	}
+
+	fmt.Printf("Get History By Performed By result:\n")
+	fmt.Printf("Success: %t\n", resp.Success)
+	fmt.Printf("Message: %s\n", resp.Message)
+	fmt.Printf("Histories:\n")
+	for i, history := range resp.Histories {
+		fmt.Printf("  [%d] ID: %s, Zone ID: %s, Action: %s, Date: %s, Performed By: %s\n",
+			i+1, history.Id, history.ZoneId, history.Action.String(), history.ActionDate.AsTime().Format("2006-01-02 15:04:05"), history.PerformedBy)
+		fmt.Printf("      Notes: %s\n", history.Notes)
+	}
+}
+
 // ================== Menu Functions ==================
 
 func printMainMenu() {
 	fmt.Println("\n=== gRPC Farm Service Test Client ===")
 	fmt.Println("1. Greenhouse Service")
 	fmt.Println("2. Growing Zone Service")
+	fmt.Println("3. Greenhouse Installation Log Service")
+	fmt.Println("4. Growing Zone History Service")
 	fmt.Println("0. Exit")
 	fmt.Print("Enter your choice: ")
 }
@@ -631,6 +1071,27 @@ func printGrowingZoneMenu() {
 	fmt.Println("4. Get Zones By Greenhouse")
 	fmt.Println("5. Update Growing Zone")
 	fmt.Println("6. Delete Growing Zone")
+	fmt.Println("0. Back to Main Menu")
+	fmt.Print("Enter your choice: ")
+}
+
+func printGreenhouseInstallationLogMenu() {
+	fmt.Println("\n=== Greenhouse Installation Log Service ===")
+	fmt.Println("1. Create Installation Log")
+	fmt.Println("2. Get Logs By Greenhouse")
+	fmt.Println("3. Get Logs By Action")
+	fmt.Println("4. Get Logs By Date Range")
+	fmt.Println("0. Back to Main Menu")
+	fmt.Print("Enter your choice: ")
+}
+
+func printGrowingZoneHistoryMenu() {
+	fmt.Println("\n=== Growing Zone History Service ===")
+	fmt.Println("1. Create Zone History")
+	fmt.Println("2. Get History By Zone")
+	fmt.Println("3. Get History By Action")
+	fmt.Println("4. Get History By Date Range")
+	fmt.Println("5. Get History By Performed By")
 	fmt.Println("0. Back to Main Menu")
 	fmt.Print("Enter your choice: ")
 }
@@ -705,6 +1166,58 @@ func main() {
 					client.TestUpdateGrowingZone()
 				case "6":
 					client.TestDeleteGrowingZone()
+				case "0":
+				default:
+					fmt.Println("Invalid choice. Please try again.")
+					continue
+				}
+				if subChoice == "0" {
+					break
+				}
+			}
+		case "3":
+			// Greenhouse Installation Log Service
+			for {
+				printGreenhouseInstallationLogMenu()
+				subChoice, _ := reader.ReadString('\n')
+				subChoice = cleanInput(subChoice)
+
+				switch subChoice {
+				case "1":
+					client.TestCreateInstallationLog()
+				case "2":
+					client.TestGetLogsByGreenhouse()
+				case "3":
+					client.TestGetLogsByAction()
+				case "4":
+					client.TestGetLogsByDateRange()
+				case "0":
+				default:
+					fmt.Println("Invalid choice. Please try again.")
+					continue
+				}
+				if subChoice == "0" {
+					break
+				}
+			}
+		case "4":
+			// Growing Zone History Service
+			for {
+				printGrowingZoneHistoryMenu()
+				subChoice, _ := reader.ReadString('\n')
+				subChoice = cleanInput(subChoice)
+
+				switch subChoice {
+				case "1":
+					client.TestCreateZoneHistory()
+				case "2":
+					client.TestGetHistoryByZone()
+				case "3":
+					client.TestGetHistoryByAction()
+				case "4":
+					client.TestGetHistoryByDateRange()
+				case "5":
+					client.TestGetHistoryByPerformedBy()
 				case "0":
 				default:
 					fmt.Println("Invalid choice. Please try again.")

@@ -3,44 +3,50 @@ package growing_zone_history
 import (
 	"context"
 	"farm-service/domain/entity"
+	"farm-service/domain/repository"
 	"time"
+
+	"github.com/anhvanhoa/service-core/domain/oops"
+)
+
+var (
+	ErrInvalidStartDateFormat = oops.New("invalid start date format")
+	ErrInvalidEndDateFormat   = oops.New("invalid end date format")
 )
 
 type GetHistoryByDateRangeRequest struct {
-	StartDate string `json:"start_date" binding:"required"`
-	EndDate   string `json:"end_date" binding:"required"`
+	StartDate string
+	EndDate   string
 }
 
-type GetHistoryByDateRangeUseCase struct {
-	BaseUseCase
+type GetHistoryByDateRangeUsecase interface {
+	Execute(ctx context.Context, req *GetHistoryByDateRangeRequest) ([]*entity.GrowingZoneHistory, error)
 }
 
-func NewGetHistoryByDateRangeUseCase(baseUseCase *BaseUseCase) *GetHistoryByDateRangeUseCase {
-	return &GetHistoryByDateRangeUseCase{
-		BaseUseCase: *baseUseCase,
+type getHistoryByDateRangeUsecase struct {
+	historyRepo repository.GrowingZoneHistoryRepository
+}
+
+func NewGetHistoryByDateRangeUsecase(historyRepo repository.GrowingZoneHistoryRepository) GetHistoryByDateRangeUsecase {
+	return &getHistoryByDateRangeUsecase{
+		historyRepo: historyRepo,
 	}
 }
 
-func (u *GetHistoryByDateRangeUseCase) Execute(ctx context.Context, req *GetHistoryByDateRangeRequest) ([]*entity.GrowingZoneHistory, error) {
+func (u *getHistoryByDateRangeUsecase) Execute(ctx context.Context, req *GetHistoryByDateRangeRequest) ([]*entity.GrowingZoneHistory, error) {
 	// Validate date format
 	_, err := time.Parse("2006-01-02", req.StartDate)
 	if err != nil {
-		return nil, &entity.Error{
-			Code:    "INVALID_START_DATE_FORMAT",
-			Message: "Invalid start date format. Expected YYYY-MM-DD",
-		}
+		return nil, ErrInvalidStartDateFormat
 	}
 
 	_, err = time.Parse("2006-01-02", req.EndDate)
 	if err != nil {
-		return nil, &entity.Error{
-			Code:    "INVALID_END_DATE_FORMAT",
-			Message: "Invalid end date format. Expected YYYY-MM-DD",
-		}
+		return nil, ErrInvalidEndDateFormat
 	}
 
 	// Lấy history theo khoảng thời gian
-	histories, err := u.HistoryRepo.GetByDateRange(ctx, req.StartDate, req.EndDate)
+	histories, err := u.historyRepo.GetByDateRange(ctx, req.StartDate, req.EndDate)
 	if err != nil {
 		return nil, err
 	}

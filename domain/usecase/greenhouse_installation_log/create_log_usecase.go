@@ -3,64 +3,61 @@ package greenhouse_installation_log
 import (
 	"context"
 	"farm-service/domain/entity"
+	"farm-service/domain/repository"
+	"farm-service/domain/usecase/greenhouse"
 	"time"
-
-	"github.com/google/uuid"
 )
 
 type CreateLogRequest struct {
-	GreenhouseID string `json:"greenhouse_id" binding:"required"`
-	Action       string `json:"action" binding:"required,oneof=install upgrade maintenance relocate dismantle"`
-	ActionDate   string `json:"action_date" binding:"required"`
-	Description  string `json:"description"`
-	PerformedBy  string `json:"performed_by" binding:"required"`
+	GreenhouseID string
+	Action       string
+	ActionDate   time.Time
+	Description  string
+	PerformedBy  string
 }
 
-type CreateLogUseCase struct {
-	BaseUseCase
+type CreateLogUsecase interface {
+	Execute(ctx context.Context, req *CreateLogRequest) (*entity.GreenhouseInstallationLog, error)
 }
 
-func NewCreateLogUseCase(baseUseCase *BaseUseCase) *CreateLogUseCase {
-	return &CreateLogUseCase{
-		BaseUseCase: *baseUseCase,
+type createLogUsecase struct {
+	greenhouseRepo repository.GreenhouseRepository
+	logRepo        repository.GreenhouseInstallationLogRepository
+}
+
+func NewCreateLogUsecase(
+	greenhouseRepo repository.GreenhouseRepository,
+	logRepo repository.GreenhouseInstallationLogRepository,
+) CreateLogUsecase {
+	return &createLogUsecase{
+		greenhouseRepo: greenhouseRepo,
+		logRepo:        logRepo,
 	}
 }
 
-func (u *CreateLogUseCase) Execute(ctx context.Context, req *CreateLogRequest) (*entity.GreenhouseInstallationLog, error) {
-	// Kiểm tra greenhouse có tồn tại không
-	greenhouse, err := u.GreenhouseRepo.GetByID(ctx, req.GreenhouseID)
+func (u *createLogUsecase) Execute(ctx context.Context, req *CreateLogRequest) (*entity.GreenhouseInstallationLog, error) {
+	gh, err := u.greenhouseRepo.GetByID(ctx, req.GreenhouseID)
+
+	if gh == nil {
+		return nil, greenhouse.ErrNotFound
+	}
+
 	if err != nil {
 		return nil, err
-	}
-	if greenhouse == nil {
-		return nil, &entity.Error{
-			Code:    "GREENHOUSE_NOT_FOUND",
-			Message: "Greenhouse not found",
-		}
-	}
-
-	// Parse action date
-	actionDate, err := time.Parse("2006-01-02", req.ActionDate)
-	if err != nil {
-		return nil, &entity.Error{
-			Code:    "INVALID_DATE_FORMAT",
-			Message: "Invalid date format. Expected YYYY-MM-DD",
-		}
 	}
 
 	// Tạo log mới
 	log := &entity.GreenhouseInstallationLog{
-		ID:           uuid.New().String(),
 		GreenhouseID: req.GreenhouseID,
 		Action:       req.Action,
-		ActionDate:   actionDate,
+		ActionDate:   req.ActionDate,
 		Description:  req.Description,
 		PerformedBy:  req.PerformedBy,
 		CreatedAt:    time.Now(),
 	}
 
 	// Lưu vào database
-	err = u.LogRepo.Create(ctx, log)
+	err = u.logRepo.Create(ctx, log)
 	if err != nil {
 		return nil, err
 	}

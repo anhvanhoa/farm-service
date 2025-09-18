@@ -3,25 +3,30 @@ package greenhouse_installation_log
 import (
 	"context"
 	"farm-service/domain/entity"
+	"farm-service/domain/repository"
 )
 
 type GetLogsByActionRequest struct {
 	Action string `json:"action" binding:"required,oneof=install upgrade maintenance relocate dismantle"`
 }
 
-type GetLogsByActionUseCase struct {
-	BaseUseCase
+type GetLogsByActionUsecase interface {
+	Execute(ctx context.Context, req *GetLogsByActionRequest) ([]*entity.GreenhouseInstallationLog, error)
 }
 
-func NewGetLogsByActionUseCase(baseUseCase *BaseUseCase) *GetLogsByActionUseCase {
-	return &GetLogsByActionUseCase{
-		BaseUseCase: *baseUseCase,
+type getLogsByActionUsecase struct {
+	logRepo repository.GreenhouseInstallationLogRepository
+}
+
+func NewGetLogsByActionUsecase(logRepo repository.GreenhouseInstallationLogRepository) GetLogsByActionUsecase {
+	return &getLogsByActionUsecase{
+		logRepo: logRepo,
 	}
 }
 
-func (u *GetLogsByActionUseCase) Execute(ctx context.Context, req *GetLogsByActionRequest) ([]*entity.GreenhouseInstallationLog, error) {
+func (u *getLogsByActionUsecase) Execute(ctx context.Context, req *GetLogsByActionRequest) ([]*entity.GreenhouseInstallationLog, error) {
 	// Lấy logs theo action
-	logs, err := u.LogRepo.GetByAction(ctx, req.Action)
+	logs, err := u.logRepo.GetByAction(ctx, req.Action)
 	if err != nil {
 		return nil, err
 	}

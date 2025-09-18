@@ -3,37 +3,47 @@ package greenhouse_installation_log
 import (
 	"context"
 	"farm-service/domain/entity"
+	"farm-service/domain/repository"
+	"farm-service/domain/usecase/greenhouse"
 )
 
 type GetLogsByGreenhouseRequest struct {
 	GreenhouseID string `json:"greenhouse_id" binding:"required"`
 }
 
-type GetLogsByGreenhouseUseCase struct {
-	BaseUseCase
+type GetLogsByGreenhouseUsecase interface {
+	Execute(ctx context.Context, req *GetLogsByGreenhouseRequest) ([]*entity.GreenhouseInstallationLog, error)
 }
 
-func NewGetLogsByGreenhouseUseCase(baseUseCase *BaseUseCase) *GetLogsByGreenhouseUseCase {
-	return &GetLogsByGreenhouseUseCase{
-		BaseUseCase: *baseUseCase,
+type getLogsByGreenhouseUsecase struct {
+	greenhouseRepo repository.GreenhouseRepository
+	logRepo        repository.GreenhouseInstallationLogRepository
+}
+
+func NewGetLogsByGreenhouseUsecase(
+	greenhouseRepo repository.GreenhouseRepository,
+	logRepo repository.GreenhouseInstallationLogRepository,
+) GetLogsByGreenhouseUsecase {
+	return &getLogsByGreenhouseUsecase{
+		greenhouseRepo: greenhouseRepo,
+		logRepo:        logRepo,
 	}
 }
 
-func (u *GetLogsByGreenhouseUseCase) Execute(ctx context.Context, req *GetLogsByGreenhouseRequest) ([]*entity.GreenhouseInstallationLog, error) {
+func (u *getLogsByGreenhouseUsecase) Execute(ctx context.Context, req *GetLogsByGreenhouseRequest) ([]*entity.GreenhouseInstallationLog, error) {
 	// Kiểm tra greenhouse có tồn tại không
-	greenhouse, err := u.GreenhouseRepo.GetByID(ctx, req.GreenhouseID)
+	gh, err := u.greenhouseRepo.GetByID(ctx, req.GreenhouseID)
+
+	if gh == nil {
+		return nil, greenhouse.ErrNotFound
+	}
+
 	if err != nil {
 		return nil, err
 	}
-	if greenhouse == nil {
-		return nil, &entity.Error{
-			Code:    "GREENHOUSE_NOT_FOUND",
-			Message: "Greenhouse not found",
-		}
-	}
 
 	// Lấy logs theo greenhouse ID
-	logs, err := u.LogRepo.GetByGreenhouseID(ctx, req.GreenhouseID)
+	logs, err := u.logRepo.GetByGreenhouseID(ctx, req.GreenhouseID)
 	if err != nil {
 		return nil, err
 	}

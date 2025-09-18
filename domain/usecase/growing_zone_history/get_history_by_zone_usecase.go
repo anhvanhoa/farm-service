@@ -3,37 +3,44 @@ package growing_zone_history
 import (
 	"context"
 	"farm-service/domain/entity"
+	"farm-service/domain/repository"
+	growingzone "farm-service/domain/usecase/growing_zone"
 )
 
 type GetHistoryByZoneRequest struct {
 	ZoneID string `json:"zone_id" binding:"required"`
 }
 
-type GetHistoryByZoneUseCase struct {
-	BaseUseCase
+type GetHistoryByZoneUsecase interface {
+	Execute(ctx context.Context, req *GetHistoryByZoneRequest) ([]*entity.GrowingZoneHistory, error)
 }
 
-func NewGetHistoryByZoneUseCase(baseUseCase *BaseUseCase) *GetHistoryByZoneUseCase {
-	return &GetHistoryByZoneUseCase{
-		BaseUseCase: *baseUseCase,
+type getHistoryByZoneUsecase struct {
+	growingZoneRepo repository.GrowingZoneRepository
+	historyRepo     repository.GrowingZoneHistoryRepository
+}
+
+func NewGetHistoryByZoneUsecase(
+	growingZoneRepo repository.GrowingZoneRepository,
+	historyRepo repository.GrowingZoneHistoryRepository,
+) GetHistoryByZoneUsecase {
+	return &getHistoryByZoneUsecase{
+		growingZoneRepo: growingZoneRepo,
+		historyRepo:     historyRepo,
 	}
 }
 
-func (u *GetHistoryByZoneUseCase) Execute(ctx context.Context, req *GetHistoryByZoneRequest) ([]*entity.GrowingZoneHistory, error) {
-	// Kiểm tra growing zone có tồn tại không
-	zone, err := u.GrowingZoneRepo.GetByID(ctx, req.ZoneID)
+func (u *getHistoryByZoneUsecase) Execute(ctx context.Context, req *GetHistoryByZoneRequest) ([]*entity.GrowingZoneHistory, error) {
+	zone, err := u.growingZoneRepo.GetByID(ctx, req.ZoneID)
+	if zone == nil {
+		return nil, growingzone.ErrNotFoundGrowingZone
+	}
 	if err != nil {
 		return nil, err
 	}
-	if zone == nil {
-		return nil, &entity.Error{
-			Code:    "GROWING_ZONE_NOT_FOUND",
-			Message: "Growing zone not found",
-		}
-	}
 
 	// Lấy history theo zone ID
-	histories, err := u.HistoryRepo.GetByZoneID(ctx, req.ZoneID)
+	histories, err := u.historyRepo.GetByZoneID(ctx, req.ZoneID)
 	if err != nil {
 		return nil, err
 	}

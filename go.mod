@@ -4,9 +4,8 @@ go 1.24.6
 
 require (
 	github.com/anhvanhoa/service-core v0.0.0-20250918032651-82aea4a19ba1
-	github.com/anhvanhoa/sf-proto v0.0.0-20250918082311-cf22eacee3cb
+	github.com/anhvanhoa/sf-proto v0.0.0-20250918065725-f15853833668
 	github.com/go-pg/pg/v10 v10.15.0
-	github.com/google/uuid v1.6.0
 	github.com/spf13/viper v1.20.1
 	go.uber.org/zap v1.27.0
 	google.golang.org/grpc v1.75.0

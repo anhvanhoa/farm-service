@@ -1,0 +1,20 @@
+package greenhouse_installation_log_service
+
+import (
+	"farm-service/domain/repository"
+	"farm-service/domain/usecase/greenhouse_installation_log"
+
+	greenhouseInstallationLogP "github.com/anhvanhoa/sf-proto/gen/greenhouse_installation_log/v1"
+)
+
+type GreenhouseInstallationLogService struct {
+	greenhouseInstallationLogP.UnsafeGreenhouseInstallationLogServiceServer
+	greenhouseInstallationLogUsecase greenhouse_installation_log.GreenhouseInstallationLogUsecase
+}
+
+func NewGreenhouseInstallationLogService(greenhouseRepository repository.GreenhouseRepository, greenhouseInstallationLogRepository repository.GreenhouseInstallationLogRepository) greenhouseInstallationLogP.GreenhouseInstallationLogServiceServer {
+	greenhouseInstallationLogUsecase := greenhouse_installation_log.NewGreenhouseInstallationLogUsecase(greenhouseRepository, greenhouseInstallationLogRepository)
+	return &GreenhouseInstallationLogService{
+		greenhouseInstallationLogUsecase: *greenhouseInstallationLogUsecase,
+	}
+}

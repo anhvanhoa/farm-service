@@ -36,7 +36,7 @@ func (u *updateGrowingZoneUsecase) Execute(ctx context.Context, id string, req *
 			return err
 		}
 		if exists {
-			return &entity.Error{Code: "ZONE_CODE_EXISTS", Message: "Zone code already exists"}
+			return ErrZoneCodeExists
 		}
 	}
 

@@ -4,17 +4,23 @@ import (
 	"farm-service/domain/repository"
 )
 
-type BaseUseCase struct {
-	GrowingZoneRepo repository.GrowingZoneRepository
-	HistoryRepo     repository.GrowingZoneHistoryRepository
+type GrowingZoneHistoryUsecase struct {
+	CreateHistory           CreateHistoryUsecase
+	GetHistoryByZone        GetHistoryByZoneUsecase
+	GetHistoryByAction      GetHistoryByActionUsecase
+	GetHistoryByDateRange   GetHistoryByDateRangeUsecase
+	GetHistoryByPerformedBy GetHistoryByPerformedByUsecase
 }
 
-func NewBaseUseCase(
+func NewGrowingZoneHistoryUsecase(
 	growingZoneRepo repository.GrowingZoneRepository,
 	historyRepo repository.GrowingZoneHistoryRepository,
-) *BaseUseCase {
-	return &BaseUseCase{
-		GrowingZoneRepo: growingZoneRepo,
-		HistoryRepo:     historyRepo,
+) *GrowingZoneHistoryUsecase {
+	return &GrowingZoneHistoryUsecase{
+		CreateHistory:           NewCreateHistoryUsecase(growingZoneRepo, historyRepo),
+		GetHistoryByZone:        NewGetHistoryByZoneUsecase(growingZoneRepo, historyRepo),
+		GetHistoryByAction:      NewGetHistoryByActionUsecase(historyRepo),
+		GetHistoryByDateRange:   NewGetHistoryByDateRangeUsecase(historyRepo),
+		GetHistoryByPerformedBy: NewGetHistoryByPerformedByUsecase(historyRepo),
 	}
 }

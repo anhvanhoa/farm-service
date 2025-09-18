@@ -4,17 +4,21 @@ import (
 	"farm-service/domain/repository"
 )
 
-type BaseUseCase struct {
-	GreenhouseRepo repository.GreenhouseRepository
-	LogRepo        repository.GreenhouseInstallationLogRepository
+type GreenhouseInstallationLogUsecase struct {
+	CreateLog           CreateLogUsecase
+	GetLogsByGreenhouse GetLogsByGreenhouseUsecase
+	GetLogsByAction     GetLogsByActionUsecase
+	GetLogsByDateRange  GetLogsByDateRangeUsecase
 }
 
-func NewBaseUseCase(
+func NewGreenhouseInstallationLogUsecase(
 	greenhouseRepo repository.GreenhouseRepository,
 	logRepo repository.GreenhouseInstallationLogRepository,
-) *BaseUseCase {
-	return &BaseUseCase{
-		GreenhouseRepo: greenhouseRepo,
-		LogRepo:        logRepo,
+) *GreenhouseInstallationLogUsecase {
+	return &GreenhouseInstallationLogUsecase{
+		CreateLog:           NewCreateLogUsecase(greenhouseRepo, logRepo),
+		GetLogsByGreenhouse: NewGetLogsByGreenhouseUsecase(greenhouseRepo, logRepo),
+		GetLogsByAction:     NewGetLogsByActionUsecase(logRepo),
+		GetLogsByDateRange:  NewGetLogsByDateRangeUsecase(logRepo),
 	}
 }

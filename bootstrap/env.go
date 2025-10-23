@@ -23,7 +23,7 @@ type Env struct {
 	UrlDb                 string                    `mapstructure:"url_db"`
 	NameService           string                    `mapstructure:"name_service"`
 	PortGrpc              int                       `mapstructure:"port_grpc"`
-	HostGprc              string                    `mapstructure:"host_grpc"`
+	HostGrpc              string                    `mapstructure:"host_grpc"`
 	IntervalCheck         string                    `mapstructure:"interval_check"`
 	TimeoutCheck          string                    `mapstructure:"timeout_check"`
 	PermissionServiceAddr string                    `mapstructure:"permission_service_addr"`

@@ -1,4 +1,5 @@
 node_env: "development"
+secret_service: 'FarmServiceSecret'
 url_db: "postgres://postgres:123456@localhost:5432/farm_service_db?sslmode=disable"
 name_service: "FarmService"
 port_grpc: 50054

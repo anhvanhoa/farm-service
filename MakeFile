@@ -5,7 +5,7 @@ PASSWORD_DB=123456
 HOST_DB=localhost
 SSL_MODE=disable
 DB_URL="postgres://${USER_DB}:${PASSWORD_DB}@${HOST_DB}:${PORT_DB}/${NAME_DB}?sslmode=${SSL_MODE}"
-NAME_CONTAINER=postgres_container
+NAME_CONTAINER=postgis-gis
 MIGRATIONS_DIR = ./migrations
 
 .PHONY: help up down version force create

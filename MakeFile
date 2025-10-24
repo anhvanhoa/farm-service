@@ -55,3 +55,6 @@ client: ## Run the client application
 
 test: ## Run the tests client
 	cd cmd/client && ./run_tests.sh
+
+docker-build: ## Build the application and run it in the container
+	export NODE_ENV=${NODE_ENV} CONFIG_FILE=${CONFIG_FILE} && docker compose up -d --build

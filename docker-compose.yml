@@ -8,7 +8,7 @@ services:
     image: farm-service:latest
     container_name: farm_service_app
     ports:
-      - "50062:50062"
+      - "40062:40062"
     networks:
       - sf_network
     environment:
@@ -25,7 +25,7 @@ services:
           "--no-verbose",
           "--tries=1",
           "--spider",
-          "http://localhost:50062/health",
+          "http://localhost:40062/health",
         ]
       interval: 30s
       timeout: 10s

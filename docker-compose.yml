@@ -6,7 +6,7 @@ services:
       secrets:
         - github_token
     image: farm-service:latest
-    container_name: farm-service_app
+    container_name: farm_service_app
     ports:
       - "50062:50062"
     networks:
